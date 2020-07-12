@@ -1,6 +1,4 @@
-// +build go1.7
-
-// Copyright (c) 2015-2018 Jeevanandam M (jeeva@myjeeva.com)
+// Copyright (c) 2015-2020 Jeevanandam M (jeeva@myjeeva.com)
 // 2016 Andrew Grigorev (https://github.com/ei-grad)
 // All rights reserved.
 // resty source code and usage is governed by a MIT style
@@ -11,6 +9,7 @@ package resty
 import (
 	"context"
 	"net/http"
+	"net/url"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -21,7 +20,7 @@ func TestSetContext(t *testing.T) {
 	ts := createGetServer(t)
 	defer ts.Close()
 
-	resp, err := R().
+	resp, err := dc().R().
 		SetContext(context.Background()).
 		Get(ts.URL + "/")
 
@@ -72,7 +71,7 @@ func TestSetContextCancel(t *testing.T) {
 		cancel()
 	}()
 
-	_, err := R().
+	_, err := dc().R().
 		SetContext(ctx).
 		Get(ts.URL + "/")
 
@@ -111,8 +110,7 @@ func TestSetContextCancelRetry(t *testing.T) {
 		cancel()
 	}()
 
-	c := dc()
-	c.SetHTTPMode().
+	c := dc().
 		SetTimeout(time.Second * 3).
 		SetRetryCount(3)
 
@@ -159,7 +157,7 @@ func TestSetContextCancelWithError(t *testing.T) {
 		cancel()
 	}()
 
-	_, err := R().
+	_, err := dc().R().
 		SetContext(ctx).
 		Get(ts.URL + "/")
 
@@ -179,15 +177,14 @@ func TestClientRetryWithSetContext(t *testing.T) {
 		t.Logf("Method: %v", r.Method)
 		t.Logf("Path: %v", r.URL.Path)
 		attp := atomic.AddInt32(&attemptctx, 1)
-		if attp <= 3 {
+		if attp <= 4 {
 			time.Sleep(time.Second * 2)
 		}
 		_, _ = w.Write([]byte("TestClientRetry page"))
 	})
 	defer ts.Close()
 
-	c := dc()
-	c.SetHTTPMode().
+	c := dc().
 		SetTimeout(time.Second * 1).
 		SetRetryCount(3)
 
@@ -195,5 +192,23 @@ func TestClientRetryWithSetContext(t *testing.T) {
 		SetContext(context.Background()).
 		Get(ts.URL + "/")
 
-	assertEqual(t, true, strings.HasPrefix(err.Error(), "Get "+ts.URL+"/"))
+	assertEqual(t, true, (strings.HasPrefix(err.Error(), "Get "+ts.URL+"/") ||
+		strings.HasPrefix(err.Error(), "Get \""+ts.URL+"/\"")))
+}
+
+func TestRequestContext(t *testing.T) {
+	client := dc()
+	r := client.NewRequest()
+	assertNotNil(t, r.Context())
+
+	r.SetContext(context.Background())
+	assertNotNil(t, r.Context())
+}
+
+func errIsContextCanceled(err error) bool {
+	ue, ok := err.(*url.Error)
+	if !ok {
+		return false
+	}
+	return ue.Err == context.Canceled
 }

@@ -1,3 +1,5 @@
-module gopkg.in/resty.v1
+module github.com/go-resty/resty/v2
 
-require golang.org/x/net v0.0.0-20180911220305-26e67e76b6c3
+require golang.org/x/net v0.0.0-20200513185701-a91f0712d120
+
+go 1.11
